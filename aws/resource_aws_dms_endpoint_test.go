@@ -71,6 +71,11 @@ func TestAccAwsDmsEndpoint_S3(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.bucket_folder", ""),
 					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.bucket_name", "bucket_name"),
 					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.compression_type", "NONE"),
+					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.data_format", "csv"),
+					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.parquet_version", "parquet-1-0"),
+					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.parquet_timestamp_in_millisecond", "false"),
+					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.encryption_mode", "SSE_KMS"),
+					resource.TestCheckResourceAttrPair(resourceName, "s3_settings.0.server_side_encryption_kms_key_id", "data.aws_kms_alias.dms", "target_key_arn"),
 				),
 			},
 			{
@@ -91,6 +96,11 @@ func TestAccAwsDmsEndpoint_S3(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.bucket_folder", "new-bucket_folder"),
 					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.bucket_name", "new-bucket_name"),
 					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.compression_type", "GZIP"),
+					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.data_format", "parquet"),
+					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.parquet_version", "parquet-2-0"),
+					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.parquet_timestamp_in_millisecond", "true"),
+					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.encryption_mode", "SSE_S3"),
+					resource.TestCheckResourceAttr(resourceName, "s3_settings.0.server_side_encryption_kms_key_id", ""),
 				),
 			},
 		},
@@ -783,6 +793,10 @@ func dmsEndpointS3Config(randId string) string {
 	return fmt.Sprintf(`
 data "aws_partition" "current" {}
 
+data "aws_kms_alias" "dms" {
+  name = "alias/aws/dms"
+}
+
 resource "aws_dms_endpoint" "dms_endpoint" {
   endpoint_id                 = "tf-test-dms-endpoint-%[1]s"
   endpoint_type               = "target"
@@ -797,8 +811,10 @@ resource "aws_dms_endpoint" "dms_endpoint" {
   }
 
   s3_settings {
-    service_access_role_arn = aws_iam_role.iam_role.arn
-    bucket_name             = "bucket_name"
+    service_access_role_arn           = aws_iam_role.iam_role.arn
+    bucket_name                       = "bucket_name"
+    encryption_mode                   = "SSE_KMS"
+    server_side_encryption_kms_key_id = data.aws_kms_alias.dms.target_key_arn
   }
 
   depends_on = [aws_iam_role_policy.dms_s3_access]
@@ -951,13 +967,16 @@ resource "aws_dms_endpoint" "dms_endpoint" {
   }
 
   s3_settings {
-    service_access_role_arn   = aws_iam_role.iam_role.arn
-    external_table_definition = "new-external_table_definition"
-    csv_row_delimiter         = "\\r"
-    csv_delimiter             = "."
-    bucket_folder             = "new-bucket_folder"
-    bucket_name               = "new-bucket_name"
-    compression_type          = "GZIP"
+    data_format                      = "parquet"
+    bucket_folder                    = "new-bucket_folder"
+    bucket_name                      = "new-bucket_name"
+    compression_type                 = "GZIP"
+    csv_delimiter                    = "."
+    csv_row_delimiter                = "\\r"
+    external_table_definition        = "new-external_table_definition"
+    parquet_timestamp_in_millisecond = true
+    parquet_version                  = "parquet-2-0"
+    service_access_role_arn          = aws_iam_role.iam_role.arn
   }
 }
 
